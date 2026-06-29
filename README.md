@@ -22,16 +22,22 @@ Whether you're looking for a sleek aesthetic, a festive vibe, or a bold neon sty
 
 ## 🤝 Contributing
 
-We'd love to feature your icon in this pack! To submit your design:
+We'd love to feature your icons in this pack:
 
-1. **Fork** this repository
-2. Add your icon to the `IconPack/` folder
-   - Naming convention: `IconName_YourName.png`
-   - Recommended size: **512×512 px** or larger, PNG format and must be a square image and image size must be less than 500 KB
-3. Add your entry to `metadata.json`
-4. Open a **Pull Request** with a short description of your icon
+1. **Fork** this repository.
+2. Add each source icon as `submissions/<name>.svg`. SVG is the only accepted
+   submission format, and each file must be no larger than 1 MB.
+3. Open a pull request with the **Icon submission** template.
+4. Complete one metadata object in the template for each submitted SVG.
 
-Please ensure your icon is your original work or properly licensed for community use.
+The pull request workflow validates every SVG, assigns a collision-safe
+four-digit ID, converts it to a Compose `ImageVector` with
+[Valkyrie](https://github.com/ComposeGears/Valkyrie), moves the generated Kotlin
+source into `pack/`, archives the numbered SVG in `svg/`, and updates
+`metadata.json`. Do not edit generated files or metadata manually.
+
+Please ensure every icon is your original work or is properly licensed for
+community redistribution.
 
 ---
 
