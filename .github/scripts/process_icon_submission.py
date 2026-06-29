@@ -35,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--event-path", type=Path)
     parser.add_argument("--base-sha")
     parser.add_argument("--valkyrie", type=Path, required=True)
+    parser.add_argument("--s2v", type=Path, required=True)
     parser.add_argument("--package-name", required=True)
     return parser.parse_args()
 
@@ -251,7 +252,7 @@ def used_ids(metadata: list[dict[str, Any]]) -> set[str]:
         if isinstance(entry.get("Id"), (str, int))
         and re.fullmatch(r"\d{4}", str(entry["Id"]))
     }
-    for directory, pattern in ((Path("pack"), "Icon????.kt"), (Path("svg"), "????.svg")):
+    for directory, pattern in ((Path("pack"), "Icon????.kt"), (Path("xml"), "????.xml")):
         for path in directory.glob(pattern):
             match = re.search(r"(\d{4})", path.name)
             if match:
@@ -316,6 +317,44 @@ def convert_icon(
         shutil.move(generated, destination)
 
 
+def convert_android_vector(s2v: Path, source: Path, destination: Path) -> None:
+    with tempfile.TemporaryDirectory(prefix="vector-drawable-") as temporary_directory:
+        generated = Path(temporary_directory) / destination.name
+        try:
+            subprocess.run(
+                [
+                    str(s2v),
+                    "--input",
+                    str(source),
+                    "--output",
+                    str(generated),
+                ],
+                check=True,
+            )
+        except subprocess.CalledProcessError as error:
+            raise SubmissionError(
+                f"svg2vectordrawable could not convert {source.as_posix()}."
+            ) from error
+        if not generated.is_file():
+            raise SubmissionError(
+                f"svg2vectordrawable did not produce the expected "
+                f"{destination.name} file."
+            )
+        try:
+            root = ElementTree.parse(generated).getroot()
+        except (ElementTree.ParseError, OSError) as error:
+            raise SubmissionError(
+                f"svg2vectordrawable produced invalid XML for {source.as_posix()}."
+            ) from error
+        if root.tag != "vector":
+            raise SubmissionError(
+                f"svg2vectordrawable did not produce an Android vector drawable "
+                f"for {source.as_posix()}."
+            )
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(generated, destination)
+
+
 def process_pull_request(args: argparse.Namespace) -> None:
     if args.event_path is None or not args.base_sha:
         raise SubmissionError(
@@ -330,14 +369,14 @@ def process_pull_request(args: argparse.Namespace) -> None:
     metadata = read_metadata(metadata_path)
     identifiers = used_ids(metadata)
     Path("pack").mkdir(exist_ok=True)
-    Path("svg").mkdir(exist_ok=True)
+    Path("xml").mkdir(exist_ok=True)
 
     for icon in icons:
         submission = Path(icon["file"])
         validate_svg(submission)
         identifier = next_id(identifiers)
         kotlin_filename = f"Icon{identifier}.kt"
-        svg_filename = f"{identifier}.svg"
+        xml_filename = f"{identifier}.xml"
 
         convert_icon(
             valkyrie=args.valkyrie,
@@ -346,14 +385,19 @@ def process_pull_request(args: argparse.Namespace) -> None:
             identifier=identifier,
             package_name=args.package_name,
         )
-        shutil.move(submission, Path("svg") / svg_filename)
+        convert_android_vector(
+            s2v=args.s2v,
+            source=submission,
+            destination=Path("xml") / xml_filename,
+        )
+        submission.unlink()
         metadata.append(
             {
                 "Id": identifier,
                 "Name": icon["name"],
                 "Author": icon["author"],
                 "Filename": kotlin_filename,
-                "Source": svg_filename,
+                "Source": xml_filename,
                 "Submission": icon["file"],
                 "Link": icon["link"],
             }
@@ -390,7 +434,7 @@ def reconcile_icon_pack(
 ) -> tuple[list[dict[str, Any]], int, int]:
     retained_metadata: list[dict[str, Any]] = []
     referenced_pack_files: set[str] = set()
-    referenced_svg_files: set[str] = set()
+    referenced_xml_files: set[str] = set()
     removed_metadata_count = 0
 
     for entry in metadata:
@@ -416,12 +460,12 @@ def reconcile_icon_pack(
             and source
             and Path(source).name == source
         ):
-            referenced_svg_files.add(source)
+            referenced_xml_files.add(source)
 
     removed_file_count = 0
     for directory, referenced_files in (
         (Path("pack"), referenced_pack_files),
-        (Path("svg"), referenced_svg_files),
+        (Path("xml"), referenced_xml_files),
     ):
         if not directory.is_dir():
             continue
@@ -500,13 +544,16 @@ def rebuild_existing_icons(args: argparse.Namespace) -> None:
         previous_asset = Path("pack") / previous_filename
         if previous_asset.name != expected_filename:
             previous_asset.unlink(missing_ok=True)
-        archived_svg = Path("svg") / f"{identifier}.svg"
-        archived_svg.parent.mkdir(parents=True, exist_ok=True)
-        archived_svg.unlink(missing_ok=True)
-        shutil.move(submission, archived_svg)
+        generated_xml = Path("xml") / f"{identifier}.xml"
+        convert_android_vector(
+            s2v=args.s2v,
+            source=submission,
+            destination=generated_xml,
+        )
+        submission.unlink()
         entry["Id"] = identifier
         entry["Filename"] = expected_filename
-        entry["Source"] = archived_svg.name
+        entry["Source"] = generated_xml.name
         entry["Submission"] = submission.as_posix()
         rebuilt_count += 1
 
@@ -530,6 +577,10 @@ def process(args: argparse.Namespace) -> None:
         raise SubmissionError("The configured Kotlin package name is invalid.")
     if not args.valkyrie.is_file():
         raise SubmissionError(f"Valkyrie executable not found at {args.valkyrie}.")
+    if not args.s2v.is_file():
+        raise SubmissionError(
+            f"svg2vectordrawable executable not found at {args.s2v}."
+        )
 
     if args.mode == "pull-request":
         process_pull_request(args)

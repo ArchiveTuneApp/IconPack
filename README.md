@@ -32,9 +32,10 @@ We'd love to feature your icons in this pack:
 
 The pull request workflow validates every SVG, assigns a collision-safe
 four-digit ID, converts it to a Compose `ImageVector` with
-[Valkyrie](https://github.com/ComposeGears/Valkyrie), moves the generated Kotlin
-source into `pack/`, archives the numbered SVG in `svg/`, and updates
-`metadata.json`. Do not edit generated files or metadata manually.
+[Valkyrie](https://github.com/ComposeGears/Valkyrie), generates an Android
+vector drawable in `xml/`, moves the generated Kotlin source into `pack/`,
+removes the submitted SVG, and updates `metadata.json`. Do not edit generated
+files or metadata manually.
 
 Please ensure every icon is your original work or is properly licensed for
 community redistribution.

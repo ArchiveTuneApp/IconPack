@@ -27,6 +27,7 @@ jobs:
     env:
       VALKYRIE_VERSION: 1.2.0
       VALKYRIE_SHA256: 58bd9d270706163e1b1c2ac9947e6a200ded302c638ec356ac3c126bf996588c
+      SVG2VECTOR_VERSION: 2.9.1
       ICON_PACKAGE_NAME: moe.rukamori.iconpack
 
     steps:
@@ -70,6 +71,14 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pinned SVG to VectorDrawable converter
+        run: npm install --global "svg2vectordrawable@${SVG2VECTOR_VERSION}"
+
       - name: Install pinned Valkyrie CLI
         run: |
           curl --fail --location --silent --show-error \
@@ -90,6 +99,7 @@ jobs:
             --event-path "$GITHUB_EVENT_PATH" \
             --base-sha "$BASE_SHA" \
             --valkyrie /tmp/valkyrie/bin/valkyrie \
+            --s2v "$(command -v s2v)" \
             --package-name "$ICON_PACKAGE_NAME"
 
       - name: Commit generated vectors and metadata
@@ -113,8 +123,8 @@ jobs:
 
           git config user.name "$pat_login"
           git config user.email "${pat_id}+${pat_login}@users.noreply.github.com"
-          git add metadata.json pack svg submissions
-          git commit -m "build(icon-pack): generate submitted ImageVectors"
+          git add metadata.json pack xml submissions
+          git commit -m "build(icon-pack): generate submitted vectors"
           git remote set-url origin "https://x-access-token:${ICON_PACK_PAT}@github.com/${HEAD_REPOSITORY}.git"
           git push origin "HEAD:${HEAD_BRANCH}"
 
@@ -128,6 +138,7 @@ jobs:
     env:
       VALKYRIE_VERSION: 1.2.0
       VALKYRIE_SHA256: 58bd9d270706163e1b1c2ac9947e6a200ded302c638ec356ac3c126bf996588c
+      SVG2VECTOR_VERSION: 2.9.1
       ICON_PACKAGE_NAME: moe.rukamori.iconpack
 
     steps:
@@ -157,6 +168,14 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pinned SVG to VectorDrawable converter
+        run: npm install --global "svg2vectordrawable@${SVG2VECTOR_VERSION}"
+
       - name: Install pinned Valkyrie CLI
         run: |
           curl --fail --location --silent --show-error \
@@ -172,6 +191,7 @@ jobs:
           python3 .github/scripts/process_icon_submission.py \
             --mode rebuild \
             --valkyrie /tmp/valkyrie/bin/valkyrie \
+            --s2v "$(command -v s2v)" \
             --package-name "$ICON_PACKAGE_NAME"
 
       - name: Commit reconciled icon pack
@@ -193,7 +213,7 @@ jobs:
 
           git config user.name "$pat_login"
           git config user.email "${pat_id}+${pat_login}@users.noreply.github.com"
-          git add metadata.json pack svg submissions
-          git commit -m "build(icon-pack): rebuild and reconcile ImageVectors"
+          git add metadata.json pack xml submissions
+          git commit -m "build(icon-pack): rebuild and reconcile vectors"
           git remote set-url origin "https://x-access-token:${ICON_PACK_PAT}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin "HEAD:${TARGET_BRANCH}"
