@@ -21,6 +21,12 @@ REQUIRED_FIELDS = ("name", "author", "file")
 ALLOWED_FIELDS = frozenset((*REQUIRED_FIELDS, "link"))
 SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 MAX_SVG_BYTES = 1_000_000
+SVG_DOCTYPE_PATTERN = re.compile(
+    rb"<!DOCTYPE\s+svg(?:\s+(?:PUBLIC|SYSTEM)\s+"
+    rb"(?:\"[^\"]*\"|'[^']*')"
+    rb"(?:\s+(?:\"[^\"]*\"|'[^']*'))?)?\s*>",
+    re.IGNORECASE,
+)
 PACKAGE_NAME_PATTERN = re.compile(
     r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+$"
 )
@@ -238,10 +244,17 @@ def validate_svg(path: Path) -> None:
             "SVG XML file instead of renaming a PNG file."
         )
     upper_svg_bytes = svg_bytes.upper()
-    if b"<!DOCTYPE" in upper_svg_bytes or b"<!ENTITY" in upper_svg_bytes:
-        raise SubmissionError(f"{path.as_posix()} must not declare a DTD or entity.")
+    if b"<!ENTITY" in upper_svg_bytes:
+        raise SubmissionError(f"{path.as_posix()} must not declare an entity.")
+    sanitized_svg_bytes, doctype_count = SVG_DOCTYPE_PATTERN.subn(
+        b"", svg_bytes, count=1
+    )
+    if b"<!DOCTYPE" in sanitized_svg_bytes.upper():
+        raise SubmissionError(
+            f"{path.as_posix()} contains an unsupported DTD declaration."
+        )
     try:
-        root = ElementTree.parse(path).getroot()
+        root = ElementTree.fromstring(sanitized_svg_bytes)
     except ElementTree.ParseError as error:
         raise SubmissionError(f"{path.as_posix()} is not valid XML: {error}") from error
     if root.tag != f"{{{SVG_NAMESPACE}}}svg" and root.tag != "svg":
@@ -261,6 +274,8 @@ def validate_svg(path: Path) -> None:
                 raise SubmissionError(
                     f"{path.as_posix()} contains an external SVG reference."
                 )
+    if doctype_count:
+        path.write_bytes(sanitized_svg_bytes)
 
 
 def read_metadata(path: Path) -> list[dict[str, Any]]:
