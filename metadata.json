@@ -8,5 +8,15 @@
     "Id": "5847",
     "Source": "sakura_chartreux_5847.xml",
     "Submission": "submissions/Sakura_Chartreux.svg"
+  },
+  {
+    "Id": "104570",
+    "Name": "Marin Kitagawa",
+    "Author": "raspweed",
+    "Filename": "IconMarinKitagawaByRaspweed104570.kt",
+    "Source": "marin_kitagawa_raspweed_104570.xml",
+    "Submission": "submissions/raspweed.svg",
+    "Link": "https://github.com/raspweed/IconPack",
+    "GitHubAuthorUrl": "https://github.com/raspweed"
   }
 ]
